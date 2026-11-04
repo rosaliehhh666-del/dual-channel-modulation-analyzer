@@ -1,6 +1,28 @@
 # 双通道信号采集与调制分析仪
+**双通道同步采集 · 共享 FFT · 数字锁相与调制分析**
 
-仪器由两块芯片组成：Artix-7 FPGA 负责双通道 12 位 65 MSPS 同步采集和全部信号处理，RK3506 跑 Linux，用 LVGL 驱动 7 英寸触摸屏。FPGA RTL、屏端源码、串口协议和验证记录都在本仓库。
+基于 Artix-7 XC7A35T 与 RK3506 的软硬件协同仪器：FPGA 承担采集及实时数字处理，Linux 触摸屏呈现波形、频谱、幅相和调制分析结果。
+
+| 采集 | FPGA 处理 | 交互显示 |
+|---|---|---|
+| 双通道 12 位 / 每路 65 MSPS | 4096 点共享 FFT、DDC、锁相、H1～H5 | RK3506 / Linux / LVGL / 7 英寸触摸屏 |
+
+**个人负责：FPGA RTL 与数字信号处理**，包括双通道采集、FFT、锁相、谐波分析。团队分工沿用原项目 README；YiHuan15 与 rosaliehhh666-del 是同一成员的两个账号。
+
+[个人贡献与源码入口](docs/个人贡献.md) · [版本及验证边界](docs/VERSION.md) · [FPGA 构建](fpga/README.md) · [贡献证据索引](docs/项目贡献与证据索引.md)
+
+> 项目来源：由 [Creamy-coffee/dual-channel-modulation-analyzer](https://github.com/Creamy-coffee/dual-channel-modulation-analyzer) 导入，保留原作者、团队署名、分支历史和 GPL-3.0 许可。本仓库由 rosaliehhh666-del 独立维护与展示，非个人独立完成全部系统；不会自动同步上游修改。
+
+## 快速了解
+
+- **硬件处理链**：双路同步采集、多速率前端和共享运算单元，在 XC7A35T 中实现频谱、DDC、锁相及谐波相关处理。
+- **工程闭环**：提供 RTL、约束、测试平台、实现报告、协议、屏端源码与实屏截图，按版本核对构建和测试结果。
+- **可观察的有效性**：CRC 完整性、配置回显、测量资格和结果年龄分别处理，避免把无效数据作为正式测量值。
+
+UART 是 2 Mbaud 的快照/分析结果链路，不能连续上传双路 65 MSPS 原始采样。H1～H5 与有限阶 THD 已有指定条件功能验证，精密幅相和失真校准仍保留边界。
+
+
+仪器由两块芯片组成：Artix-7 FPGA 负责双通道 12 位 65 MSPS 同步采集与片上实时处理；RK3506 跑 Linux，承担界面、重建及部分调制分析/符号判决，用 LVGL 驱动 7 英寸触摸屏。FPGA RTL、屏端源码、串口协议和验证记录都在本仓库。
 
 > 2026 全国大学生嵌入式芯片与系统设计竞赛 · FPGA 创新设计赛道 · AMD 自主选题
 
@@ -8,7 +30,7 @@
 
 ## 系统组成
 
-信号链是固定的：双通道 12 位 65 MSPS 同步采样 → 多速率抽取 → 4096 点共享 FFT → DDC → 片上频率捕获与锁相 → H1–H5 谐波功率 → CRC32 成帧，全部在 XC7A35T 内完成。屏端把这套结果画成七页界面，并在调制页做 AM 调制度估计和 OOK / 2FSK / BPSK 的符号判决。
+FPGA 从双通道 12 位 65 MSPS 同步采样分出多速率 FFT、DDC、频率捕获/锁相及谐波相关处理路径，再通过 CRC32 帧输出结果；这些功能并非依次串接的一条流水线。屏端把这套结果画成七页界面，并在调制页做 AM 调制度估计和 OOK / 2FSK / BPSK 的符号判决。
 
 界面上的读数总跟有效状态一起给出：锁相页没有激励时显示「—」并置「相位变化超限」，调制页判决没完成时标「待判决」，不留上一帧的数字。
 
@@ -178,6 +200,8 @@ waveform_demo --source demo          # 无板子时用合成信号看界面
 | [@Creamy-coffee](https://github.com/Creamy-coffee) | RK3506 板端应用：DRM/KMS 渲染、触摸输入、串口链路接收与带限重建 |
 | [@YiHuan15](https://github.com/YiHuan15) | FPGA RTL 与数字信号处理：双通道采集、FFT、锁相、谐波分析 |
 
+账号说明：[@YiHuan15](https://github.com/YiHuan15) 与 [@rosaliehhh666-del](https://github.com/rosaliehhh666-del) 是同一成员；历史提交保留原作者，不改写邮箱与 SHA。个人工作范围见 [个人贡献](docs/个人贡献.md)。
+
 ## 文档索引
 
 | 文档 | 内容 |
@@ -198,3 +222,7 @@ waveform_demo --source demo          # 无板子时用合成信号看界面
 项目自身代码采用 GNU GPL v3.0（GPL-3.0-only），详见 [LICENSE](LICENSE) 与 [许可范围说明](LICENSING.md)。
 
 第三方组件：LVGL v9.1（MIT，需自行获取源码，仓库不分发）；Xilinx Vivado 2018.3 为厂商工具，不随仓库分发。其余第三方归属见 `LICENSING.md`。
+
+## 开发与协作
+
+[参与开发](CONTRIBUTING.md) · [LLM 辅助优化记录](docs/LLM辅助优化记录.md)。AI 记录保留工程复盘和纠正过程，不替代原始测试证据。
