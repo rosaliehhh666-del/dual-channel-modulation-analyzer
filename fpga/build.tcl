@@ -1,3 +1,9 @@
+set actual_vivado [version -short]
+if {$actual_vivado ne "2018.3"} {
+    error "This build requires Vivado 2018.3; found $actual_vivado."
+}
+puts [version]
+
 # Canonical source set. This stage produces a routed candidate, never a release bit.
 set root [file normalize [file dirname [info script]]]
 set ::env(UNIFIED_ID) contest_rebuild
