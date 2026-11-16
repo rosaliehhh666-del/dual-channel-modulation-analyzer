@@ -77,7 +77,16 @@ FPGA 从双通道 12 位 65 MSPS 同步采样分出多速率 FFT、DDC、频率�
 | Block RAM | 32×RAMB36 + 8×RAMB18，36 块等效（样点缓存、旋转因子、系数表、波形 LUT） |
 | 时序 | WNS +0.172 ns、WHS +0.010 ns，无 setup / hold 违例 |
 
-构建：`fpga/build.tcl` 提供完整构建脚本（Vivado 批处理建工程 → 综合 → 实现 → 出 bit）。
+### 复现 FPGA 构建
+
+验证环境为 **Vivado v2018.3（Windows 64 位，Build 2405991）**，目标器件为 `xc7a35tfgg484-2`。安装 Artix-7 器件支持后，从仓库根目录运行：
+
+```sh
+vivado -version
+vivado -mode batch -source fpga/build.tcl
+```
+
+[构建脚本](fpga/build.tcl)在启动时检查 Vivado 版本，并从源码新建工程、综合、布局布线和生成候选 bit。候选 bit `rebuilt_a222905e.bit` 与实现报告一同保存于 `fpga/reports/implementation/` 下的构建目录。
 2026-11-02 已在仓库外的独立副本上用同一套 Vivado 2018.3 跑通全流程：WNS +0.172 ns / WHS +0.010 ns
 （0 个失败端点）、20294 LUT / 13111 FF / 80 DSP / 36 BRAM、DRC 138 条全为 Warning 无 Error，
 与 `fpga/build_evidence/` 逐项一致。bit 的 SHA256 不会相同——Vivado 把构建时间写进 bit 头，
