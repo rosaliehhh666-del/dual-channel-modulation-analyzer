@@ -104,6 +104,10 @@ int main(int argc,char **argv)
     assert(scope_decimation_target(65000000,1024,64,15625,0,20,0,0)==64);
     assert(scope_decimation_target(65000000,1024,64,1000000,1,20,1,0)==16);
     assert(scope_decimation_target(65000000,1024,1,1000,1,20,0,0)==128);
+    assert(scope_timebase_decimation(65000000,1024,.000001,32768)==1);
+    assert(scope_timebase_decimation(65000000,1024,.010,32768)==1024);
+    assert(scope_timebase_decimation(65000000,1024,.020,32768)==2048);
+    assert(scope_timebase_decimation(65000000,1024,50,32768)==32768);
     assert(scope_decimation_target(65000000,1024,1,0,0,0,0,1)==1);
     assert(scope_decimation_target(65000000,1024,1,15869,0,0,0,1)==1);
     float range_lo,range_scale;scope_auto_range(-4,8,&range_lo,&range_scale);assert(fabsf(1.f/range_scale-32)<1e-5f);
@@ -302,6 +306,21 @@ int main(int argc,char **argv)
     assert(flush_count==before);
     plot_set_trace(probe,0,trace,8,V32_C_CH2,2);lv_refr_now(d);assert(flush_count>before);
     lv_obj_delete(probe);
+    /* A one-sample impulse must survive pixel reduction on the history plot. */
+    probe=plot_create(lv_screen_active(),PLOT_HIST);lv_obj_add_flag(probe,LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_set_pos(probe,30,30);lv_obj_set_size(probe,160,90);lv_obj_move_foreground(probe);
+    static float dense[1024];for(int i=0;i<1024;i++)dense[i]=.5f;dense[123]=1.f;
+    plot_set_trace(probe,0,dense,1024,lv_color_hex(0xff00ff),1);
+    lv_obj_update_layout(lv_screen_active());lv_refr_now(d);
+    lv_area_t impulse_area;assert(plot_get_data_area(probe,&impulse_area));
+    unsigned peak_pixels=0;
+    assert(impulse_area.x1>=0 && impulse_area.y1>=0 && impulse_area.y1+14<600);
+    /* Use an interior pixel column; the plot border intentionally covers edges. */
+    int impulse_x=impulse_area.x1+123*(impulse_area.x2-impulse_area.x1+1)/1024;
+    for(int y=impulse_area.y1+3;y<impulse_area.y1+14;y++)for(int x=impulse_x-2;x<impulse_x+3;x++){
+        uint32_t c=pixels[y*1024+x];if(((c>>16)&255)>180 && (c&255)>180 && ((c>>8)&255)<80)peak_pixels++;
+    }
+    assert(peak_pixels>0);lv_obj_delete(probe);
     /* A valid, constant RAW frame has no AC frequency. Do not report FFT bin1. */
     s_tb_manual=0;fixture_write(200,20,1,0,0,0,1,1);
     FILE *zero_file=fopen(fixture,"r+b");assert(zero_file);uint8_t zero_raw[4140];
@@ -312,7 +331,11 @@ int main(int argc,char **argv)
     assert(!strcmp(lv_label_get_text(s_lbl_scope_freq),"—"));
     /* Mismatched RAW/SPEC sample rates must never mix axes or cursor data. */
     S.running=true;fixture_write(210,21,1,0,0,0,1,1);append_spec();assert(v32_init_file(fixture)==0);
-    ui_set_page(UI_PAGE_FFT);fft_ch_set(1);draw(d);assert(s_spec_in_use);
+    ui_set_page(UI_PAGE_FFT);fft_ch_set(1);draw(d);
+    /* Default shows real ADC detail even when a valid integer SPEC is present. */
+    assert(s_fft_raw_source && !s_spec_in_use);
+    assert(strstr(lv_label_get_text(s_lbl_fft_win),"RAW"));
+    cb_spec_source(NULL);draw(d);assert(s_spec_in_use);
     /* Window taps must change the displayed source even with a valid SPEC frame. */
     S.running=false;S.win_idx=0;
     float window_prev[4096];memcpy(window_prev,s_real_mag,sizeof window_prev);
@@ -382,10 +405,21 @@ int main(int argc,char **argv)
     fixture_write(211,22,1,0,0,0,1,1);append_lock_meas(3,0);assert(v32_init_file(fixture)==0);
     ui_set_page(UI_PAGE_LOCK);draw(d);assert(strstr(lv_label_get_text(s_lbl_lock_state),"锁定"));
     assert(strstr(lv_label_get_text(s_lbl_lock_phase),"45.00"));save(argv[1],"lock_qualified");
+    /* Pausing holds lock phase/state even as new invalid measurements arrive. */
+    S.running=false;
+    fixture_write(212,22,1,0,0,0,1,1);append_lock_meas(1,0);assert(v32_init_file(fixture)==0);draw(d);
+    assert(strstr(lv_label_get_text(s_lbl_lock_phase),"45.00"));
+    assert(strstr(lv_label_get_text(s_lbl_lock_state),"锁定"));
+    S.running=true;
     fixture_write(212,22,1,0,0,0,1,1);append_lock_meas(1,0);assert(v32_init_file(fixture)==0);draw(d);
     assert(!strcmp(lv_label_get_text(s_lbl_lock_phase),"—"));save(argv[1],"lock_single_channel");
     fixture_write(213,22,1,0,0,0,1,1);append_lock_meas(3,1);assert(v32_init_file(fixture)==0);draw(d);
     assert(!strcmp(lv_label_get_text(s_lbl_lock_phase),"—"));
+    assert(!lv_obj_has_flag(s_lbl_lock_raw,LV_OBJ_FLAG_HIDDEN));
+    /* Recovery must remove the previous unqualified diagnostic, not just change phase. */
+    fixture_write(213,22,1,0,0,0,1,1);append_lock_meas(3,0);assert(v32_init_file(fixture)==0);draw(d);
+    assert(strstr(lv_label_get_text(s_lbl_lock_phase),"45.00"));
+    assert(lv_obj_has_flag(s_lbl_lock_raw,LV_OBJ_FLAG_HIDDEN));
     test_ms+=2000;lv_tick_inc(2000);fixture_write(214,22,1,0,0,0,1,1);append_iq();assert(v32_init_file(fixture)==0);draw(d);
     assert(!strcmp(lv_label_get_text(s_lbl_lock_phase),"—"));assert(strstr(lv_label_get_text(s_lbl_lock_state),"NCO"));save(argv[1],"lock_iq_reference");
     ui_set_page(UI_PAGE_SYSTEM);draw(d);save(argv[1],"system_large");

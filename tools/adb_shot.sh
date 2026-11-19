@@ -10,8 +10,7 @@ cd "$(dirname "$0")/.."
 
 OUT=${1:-out/adb_shot.png}
 PPM=out/_adb_shot.ppm
-# 需要一个装了 Pillow 的 python；PY= 指路径，或落到 PATH 里的 python
-PY=${PY:-python}
+PY=C:/Users/21542/.workbuddy/binaries/python/envs/default/Scripts/python.exe
 
 export MSYS_NO_PATHCONV=1
 

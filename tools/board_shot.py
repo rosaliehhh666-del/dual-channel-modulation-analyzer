@@ -6,7 +6,7 @@
   1) 换页不用真手指，直接跑 `./waveform_demo --tap X Y 150` 往 /dev/input/event0
      注入一次触摸（`--tap` 路径在 main.c 里是 lv_init() 之前就返回的，
      不碰 DRM，所以可以在主实例跑着的时候安全地执行）。
-     底部导航 7 个按钮的坐标见 NAV_TAP。
+     底部导航 5 个按钮的坐标见 NAV_TAP。
   2) 截图是给主实例发 SIGUSR1，它会调 drm_display_snapshot_ppm() 写 /tmp/wave_frame.ppm。
   3) PPM(P6, 8bit RGB) 用 Pillow 转 PNG。drm_disp.c 里已经做过 BGR->RGB 交换，
      所以这里不需要再动字节序。
@@ -21,33 +21,21 @@ import sys
 
 import paramiko
 
-# 地址与凭据只从环境变量取，代码里不留默认值（仓库公开，写死等于泄露）
-HOST = os.environ.get("BOARD_HOST")
+HOST = os.environ.get("BOARD_HOST", "192.168.1.10")
 PORT = int(os.environ.get("BOARD_PORT", "22"))
-USER = os.environ.get("BOARD_USER")
-PASS = os.environ.get("BOARD_PASS")
-
-
-def _need(name, value):
-    if not value:
-        sys.exit(f"缺少环境变量 {name}：export {name}=... 后再运行")
-    return value
+USER = os.environ.get("BOARD_USER", "root")
+PASS = os.environ.get("BOARD_PASS", "root")
 
 REMOTE_PPM = "/tmp/wave_frame.ppm"
 
-# 底部导航 7 个按钮的中心点（1024 宽七等分，每格 146.3px）。
-# 页序与 src/ui.h 的 ui_page_t 一致：
-#   示波器 / 频谱 / 锁相 / 重建 / 调制 / 系统 / 图片
+# 底部导航 5 个按钮的中心点（算出来的，见 README §「界面布局」）
 NAV_TAP = {
-    "scope":  (73,  572),
-    "wave":   (73,  572),
-    "fft":    (219, 572),
-    "lock":   (366, 572),
-    "ai":     (512, 572),      # 重建页（UI_PAGE_AI）
-    "recon":  (512, 572),
-    "mod":    (658, 572),      # 调制分析页（UI_PAGE_MOD）
-    "system": (805, 572),
-    "image":  (951, 572),      # 图片页（UI_PAGE_IMAGE）
+    "scope":  (108, 572),
+    "wave":   (108, 572),
+    "fft":    (310, 572),
+    "lock":   (512, 572),
+    "ai":     (714, 572),
+    "system": (915, 572),
 }
 
 
@@ -67,9 +55,7 @@ def main():
 
     cli = paramiko.SSHClient()
     cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    cli.connect(_need("BOARD_HOST", HOST), port=PORT,
-                username=_need("BOARD_USER", USER),
-                password=_need("BOARD_PASS", PASS),
+    cli.connect(HOST, port=PORT, username=USER, password=PASS,
                 timeout=20, look_for_keys=False, allow_agent=False)
 
     rc, o, _ = sh(cli, "pidof waveform_demo")

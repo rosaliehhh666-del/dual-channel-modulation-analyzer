@@ -37,5 +37,24 @@ int main(void)
     }
     bpsk_decoder_t r={0};float filter=-1;
     for(int fid=1;fid<=150;fid++){v32_ana_view_t v=frame(fid,0,40,&filter);for(int i=0;i<256;i++){v.y[i]=100;v.q[i]=0;}bpsk_push(&r,&v,1000,0,1);}assert(!r.locked && !r.bits);bpsk_reset(&r);
+    symbol_rate=1000;
+    bpsk_decoder_t doubled={0};
+    for(int fid=1;fid<=100;fid++){
+        v32_ana_view_t v=frame(fid,.7,145.7,&filter);
+        v.mode=4;
+        bpsk_probe_push(&r,&v,1000);
+        bpsk_probe_push(&doubled,&v,2000);
+    }
+    assert(bpsk_probe_qualified(&r));
+    assert(!bpsk_probe_qualified(&doubled));
+    for(int fid=101;fid<=170;fid++){
+        v32_ana_view_t v=frame(fid,0,40,&filter);
+        v.mode=4;
+        for(int k=0;k<256;k++){v.y[k]=100;v.q[k]=0;}
+        bpsk_probe_push(&r,&v,1000);
+    }
+    assert(!bpsk_probe_qualified(&r));
+    bpsk_reset(&r);
+    bpsk_reset(&doubled);
     puts("BPSK_DECODER_PASS PN7_CFO_phase_timing_300ppm_duplicates_gaps_flags_invalid_CW");
 }

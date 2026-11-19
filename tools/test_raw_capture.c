@@ -7,6 +7,13 @@ int main(void)
     char path[128];snprintf(path,sizeof path,"/tmp/v32_rawcap_%ld.bin",(long)getpid());
     raw_capture_t c={0};unsigned char data[4096],copy[4096];
     for(size_t i=0;i<sizeof data;i++)data[i]=(unsigned char)(i*37u);
+    assert(!raw_capture_space_ok(RAW_CAPTURE_RESERVE-1,0));
+    assert(!raw_capture_space_ok(RAW_CAPTURE_RESERVE+511,512));
+    assert(raw_capture_space_ok(RAW_CAPTURE_RESERVE+512,512));
+    assert(!raw_capture_space_ok(UINT64_MAX,UINT64_MAX));
+    /* No successful empty recording is left behind on a rejected request. */
+    assert(raw_capture_start(&c,path,SIZE_MAX)<0 && errno==ENOSPC);
+    assert(access(path,F_OK)<0 && errno==ENOENT);
     assert(raw_capture_start(&c,NULL,8192)==0);raw_capture_feed(&c,data,sizeof data);raw_capture_finish(&c);
     assert(raw_capture_start(&c,path,128u*1024u)==1);
     for(int i=0;i<24;i++)raw_capture_feed(&c,data,sizeof data);
@@ -25,6 +32,6 @@ int main(void)
     /* A closed sink causes an explicit writer failure, never a fake complete file. */
     assert(raw_capture_start(&c,path,8192)==1);close(c.fd);
     raw_capture_feed(&c,data,sizeof data);raw_capture_finish(&c);assert(c.error==EBADF);unlink(path);
-    puts("RAW_CAPTURE_PASS disabled_exact_bytes_no_overwrite_limit_overflow_writer_error");
+    puts("RAW_CAPTURE_PASS space_reserve_exact_bytes_no_overwrite_limit_overflow_writer_error");
     return 0;
 }
